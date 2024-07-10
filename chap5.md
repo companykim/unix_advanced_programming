@@ -63,3 +63,93 @@ setbuf로는 버퍼링을 켜거나 끌 수 있다. 버퍼링을 켜려면 길�
 
     int fflush(FILE *fp);
 이 함수는 스트림에 대해 아직 기록되지 않은 자료를 커널에 넘겨준다. 
+
+## 5.5 스트림 열기
+
+        #include <stdio.h>
+
+        FILE *fopen(const char *restrict pathname, const char *restrict type);
+        FILE *freopen(const char *restrict pathname, const char *restrict type, FILE *restrict fp);
+        FILE *fdopen(int filedes, const char *type);
+1. fopen 함수는 지정된 파일을 연다. </br>
+2. freopen 함수는 지정된 파일을 지정된 스트림으로 연다. 스트림이 이미 열려 있으면 닫은 후 다시 연다. </br>
+3. fdopen 함수는 기존 파일 서술자를 받아서 그 서술자에 표준 I/O 스트림을 연관시킨다. </br>
+
+type의 값들에서 문자 b는 표준 I/O 시스템이 파일의 내용을 텍스트가 아니라 이진 값으로 다루도록 지정하는 효과를 낸다. </br>
+fdopen의 type 인수는 의미가 좀 다른데, 이 함수는 이미 열려 있는 파일에 대한 서술자를 받으므로 스트림을 쓰기용으로 연다고 해도 파일이 절단되지는 않는다. 또한, 표준 I/O 추가 모드로 파일을 생성하지 못한다. 
+
+읽기 및 쓰기를 위해 파일을 여는 경우, 다음과 같은 제약이 적용된다.
+1. 출력 이후 즉시 입력을 수행할 수 없는데, fflush나 fseek, fsetpos, rewind를 거쳐야 한다.
+2. 입력 이후 즉시 출력을 수행할 수 없는데, fseek, fsetpos, rewind를 거치거나 입력 연산이 파일의 끝을 만나야 한다.
+
+열린 스트림을 닫을 때에는 fclose 함수를 사용한다. 
+        #include <stdio.h>
+
+        int fclose(FILE *fp);
+파일이 닫히기 전에 버퍼에 있는 출력 자료가 방출된다. 
+
+## 5.6 스트림 읽고 쓰기
+
+스트림을 연 후에는 스트림에 대해 세 종류의 서식 없는 I/O 연산들을 수행할 수 있다.
+1. 문자 단위 I/O. 한번에 한 문자씩 읽거나 쓸 수 있다.
+2. 줄 단위 I/O. 한번에 한 줄씩 읽거나 쓰고 싶은 경우에는 fgets 함수나 fputs 함수를 사용한다. 각 줄은 세줄 문자로 끝난다.
+3. 직접 I/O. 이런 종류의 연산은 fread 함수와 fwrite 함수가 지원한다. 각 I/O 연산마다 지정된 크기의 여러 객체들을 읽거나 쓴다.
+
+### 입력 함수들
+
+다음 세 함수들은 한번에 하나의 문자를 읽어들인다. 
+        #include <stdio.h>
+
+        int getc(FILE *fp);
+        int fgetc(FILE *fp);
+        int getchar(void);
+getchar 함수는 getc(stdin)과 동등하게 정의된다. getc와 fgetc의 차이는 getc가 매크로로 구현될 수 있는 반면, fgetc는 그럴 수 없다.
+1. getc의 인수에 side effect를 가지는 표현식을 지정하지는 말아야 한다.
+2. fgetc는 반드시 실제의 함수이므로 그 주소를 취할 수 있다. 예를 들어 fgetc의 주소를 다른 함수의 인수로 지정할 수 있다.
+3. fgetc 호출은 getc보다 더 많은 시간을 소비할 수 있다.
+
+이 세 함수들은 스트림의 다음 문자를 돌려주는데, 문자 자체는 unsigned char 형식으로 취급되지만, 반환값은 그것을 int로 변환한 결과이다. </br>
+문자가 unsigned char 형식인 이유는 최상위 비트가 설정되어 있다고 해도 음수가 되지 않기 때문이다. </br>
+이 세 함수들이 오류가 발생했을 때와 파일 끝에 도달했을 때 모두 동일한 값을 돌려줌을 주의할 것. 두 상황을 구분하려면 ferror 함수나 feof 함수를 호출해야 한다.
+
+        #include <stdio.h>
+
+        int ferror(FILE *fp);
+        int feof(FILE *fp);
+        void clearerr(FILE *fp);
+대부분의 구현은 각 스트림의 FILE 객체에 오류 플래그, 파일 끝 플래그를 둔다. </br>
+clearerr를 호출하면 두 플래그 모두 해제된다. </br>
+스트림에서 문자를 읽은 후 그 문자를 다시 스트림에 되돌려 놓는 것도 가능하다. ungetc 함수가 그런 일을 한다.
+        #include <stdio.h>
+
+        int ungetc(int c, FILE *fp);
+
+이 함수로 스트림에 되돌려 넣은 문자는 다음 번 문자 읽기에서 반환된다. 문자들을 여러 번 읽고 여러 번 되돌려 넣은 경우, 문자들은 되돌려 넣은 순서의 역순으로 다시 읽힌다. </br>
+
+### 출력 함수
+        #include <stdio.h>
+
+        int putc(int c, FILE *fp);
+        int fputc(int c, FILE *fp);
+        int putchar(int c);
+입력 함수들처럼, putchar는 putc와 동등하며, putc는 매크로로 구현될 수 있는 반면 fputc는 그럴 수 없다.
+
+## 3.7 줄 단위 I/O
+
+줄 단위 입력
+        #include <stdio.h>
+
+        char *fgets(char *restrict buf, int n, FILE *restrict fp);
+        char *gets(char *buf);
+두 함수 모두 한줄을 읽어 들일 버퍼의 주소를 받는다. gets 함수는 표준 입력을 읽는 반면 fgets는 지정된 스트림을 읽는다. </br>
+fgets는 n 인수에 버퍼의 크기를 넣어야 한다. 
+
+fputs와 puts 함수는 줄 단위 출력을 수행한다.
+        #include <stdio.h>
+
+        int fputs(const char *restrict str, FILE *restrict fp);
+        int puts(const char *str);
+fputs 함수는 주어진 널 종료 문자열을 주어진 스트림에 기록한다. puts 함수는 주어진 널 종료 문자열을 표준 출력에 기록한다.
+
+## 3.8 표준 I/O의 효율성
+
