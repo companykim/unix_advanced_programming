@@ -134,7 +134,7 @@ clearerr를 호출하면 두 플래그 모두 해제된다. </br>
         int putchar(int c);
 입력 함수들처럼, putchar는 putc와 동등하며, putc는 매크로로 구현될 수 있는 반면 fputc는 그럴 수 없다.
 
-## 3.7 줄 단위 I/O
+## 5.7 줄 단위 I/O
 
 줄 단위 입력
         #include <stdio.h>
@@ -151,5 +151,153 @@ fputs와 puts 함수는 줄 단위 출력을 수행한다.
         int puts(const char *str);
 fputs 함수는 주어진 널 종료 문자열을 주어진 스트림에 기록한다. puts 함수는 주어진 널 종료 문자열을 표준 출력에 기록한다.
 
-## 3.8 표준 I/O의 효율성
+## 5.8 표준 I/O의 효율성
 
+반드시 함수여야 하는 fgetc와 fputc를 이용해서 같은 일을 수행하는 프로그램을 만드는 것도 물론 가능하다. </br>\
+ex1, ex2에서 표준 I/O 스트림들을 명시적으로 닫지는 않음을 주목해야 한다. 어차피 exit 함수에 의해 버퍼의 자료가 방출되고 열린 스트림들이 모두 닫힐 것이기 때문이다.
+
+## 5.9 이진 I/O 
+
+이진 자료에 대해 I/O를 수행할 때에는 한번에 하나의 구조체 전체를 처리하게 되는 것이 일반적이다. </br>
+getc나 putc로 이러한 작업을 수행한다면 구조체 전체를 한번에 한바이트씩 읽거나 쓰는 루프를 돌려야 할 것이므로 비효율적이다. 이러한 작업에서는 줄 단위 함수들도 쓸모가 없다. </br>
+왜냐하면 구조체 안에는 널 바이트들이 존재할 수 있는데 fputs나 fgets는 널 바이트를 만나면 읽기나 기록을 멈추기 때문이다. 이러한 이유로, 이진 I/O를 위한 두 개의 개별적인 함수가 제공된다. 
+        #include <stdio.h>
+
+        size_t fread(void *restrict ptr, size_t size, size_t nobj, FILE *restrict fp);
+        size_t fwrite(const void *restrict ptr, size_t size, size_t nobj, FILE *restrict fp);
+이 함수들의 주된 용도는 </br>
+1. 이진 배열을 읽거나 쓴다.
+2. 하나의 구조체를 읽거나 쓴다.
+
+이진 I/O의 한 가지 근본적인 문제는 한 시스템에서 이진 I/O로 기록된 자료를 그와 동일한 시스템에서만 읽을 수 있다는 것이다.
+
+## 5.10 스트림 위치 조회 및 설정
+
+표준 I/O 스트림의 읽기, 쓰기 위치를 조회하거나 설정하는 방법 </br>
+1. ftell 함수와 fseek 함수를 이용한다. 파일의 위치를 하나의 긴 정수(long)에 저장할 수 있다고 가정한다는 문제가 있다.
+2. ftello 함수와 fseeko 함수를 이용한다. 이들은 긴 정수로는 적합하지 않은 파일 오프셋들을 허용하기 위해 단일 UNIX 규격이 제공하는 것으로 , 긴 정수 대신 off_t 형식을 사용함.
+3. fgetpos 함수와 fsetpos 함수를 이용한다. 이들은 ISO C의 일부이며, 파일의 위치를 fpos_t라는 추상 자료 형식에 담는다. 구현들은 이 형식을 파일의 위치를 담는데 충분한 크기의 구체적인 자료 형식으로 정의할 수 있다.
+
+비 UNIX 시스템으로의 이식성까지 갖추어야 하는 응용프로그램이라면 반드시 fgetpos와 fsetpos를 사용해야 한다.
+        #include <stdio.h>
+
+        long ftell(FILE *fp);
+        int fseek(FILE *fp, long offset, int whence);
+        void rewind(FILE *fp);
+이진 파일의 경우 파일 위치 지시자는 파일 시작을 기준으로 측정한 현재 읽기/쓰기 위치이다. 이진 파일에 대해 ftell이 돌려주는 값이 이 바이트 위치이다. </br>
+fseek로 이진 파일의 위치를 변경할 때에는 offset 인수에 이동량을, whence 인수에 이동의 기준을 지정해야 한다. whence의 값은 lseek 함수의 해당 인수의 값과 동일하다. </br>
+즉, SEEK_SET은 파일의 시작, SEEK_CUR는 현재 파일 위치, SEEK_END는 파일의 끝을 의미한다. </br>
+ftello 함수와 fseeko 함수는 ftell, fseek 함수와 비슷하되, 반환값의 형식이 long이 아니라 off_t라는 점에서 차이를 보인다. 
+        #include <stdio.h>
+
+        off_t ftello(FILE *fp);
+        int fseeko(FILE *fp, off_t offset, int whence);
+
+        #include <stdio.h>
+
+        int fgetpos(FILE *restrict fp, fpos_t *restrict pos);
+        int fsetpos(FILE *fp, const fpos_t *pos);
+
+fgetpos 함수는 파일 위치 지시자의 현재 값을 pos가 가리키는 객체에 저장한다. 이후 이 값을 fsetpos 호출에서 사용함으로써 스트림을 지금의 위치로 되돌릴 수 있다.
+
+## 5.11 서식화된 I/O
+
+### 서식화된 출력
+        #include <stdio.h>
+
+        int printf(const char *restrict format, ...);
+        int fprintf(FILE *restrict fp, const char *restrict format, ...);
+        int sprintf(char *restrict buf, const char *restrict format, ...);
+        int snprintf(char *restrict buf, size_t n, const char *restrict format, ...);
+printf 함수는 표준 출력에, fprintf 함수는 지정된 스트림에, sprintf 함수는 buf 배열에 서식화된 문자들을 기록한다. </br>
+sprintf 함수는 배열의 끝에 자동으로 널 바이트 하나를 추가하나, 이 널 바이트가 반환값(문자 개수)에 포함되지는 않는다. </br>
+sprintf 호출 시 buf가 가리키는 버퍼가 넘칠 수 있음을 주의해야 함. 잠재적인 버퍼 넘침 문제 때문에 도입된 것이 snprintf라는 함수다. 이 함수를 호출할 때에는 인수로 버퍼의 크기를 명시적으로 지정한다. 기록할 문자의 개수가 버퍼의 크기를 넘으면 여분의 문자들은 그냥 폐기된다. snprintf 함수는 버퍼가 충분히 컸다면 기록되었을 문자들의 개수를 돌려준다. </br>
+
+format 인수는 서식 문자열 또는 서식 명세이다. 서식 문자열은 퍼센트 기호(%)로 시작하는 변환 명세들과 그 외의 문자들로 구성된다. </br>
+변환 명세들은 format 인수 다음의 인수들이 부호화, 표시되는 방식을 결정하는데, 변환 명세들 이외의 문자들은 수정없이 그대로 출력된다. </br>
+하나의 변환 명세의 구성은
+        % [플래그] [필드너비] [정밀도] [길이 수정자] 변환형식
+필드너비 성분은 변환의 최소 필드 너비를 지정. 정밀도 성분은 변환 결과의 정밀도를 지정하는 것. 필드 너비나 정밀도에 특정 수치 대신 별표(*)를 지정하는 것도 가능함. </br>
+길이 수정자 성분은 인수의 크기를 지정함. 변환 형식 성분은 반드시 지정해야 한다. 이것은 인수의 해석 방식을 결정한다. 
+        #include <stdarg.h>
+        #include <stdio.h>
+
+        int vprintf(const char *restrict format, va_list arg);
+        int vfprintf(FILE *restrict fp, const char *restrict format, va_list arg);
+        int vsprintf(char *restrict buf, const char *restrict format, va_list arg);
+        int vsnprintf(char *restrict buf, size_t n, const char *restrict format, va_list arg);
+
+### 서식화된 입력
+
+        #include <stdio.h>
+
+        int scanf(const char *restrict format, ...);
+        int fscanf(FILE *restrict fp, const char *restrict format, ...);
+        int sscanf(const char *restrict buf, const char *restrict format, ...);
+scanf류 함수들은 하나의 입력 스트림을 분석해서 문자열 조각들을 지정된 형식의 변수들에 배정하는데 쓰인다. format 인수 이후의 인수들은 변환 결과가 기록될 변수들의 주소들이다. </br>
+인수들이 어떻게 변환, 배정되는지는 format으로 지정된 서식 문자열이 결정한다. 서식 문자열의 한 변환 명세는 % 기호로 시작한다. </br>
+변환 명세의 구성
+        % [*] [필드너비] [길이 수정자] 변환형식
+생략 가능한 선행 발표는 배정이 일어나지 않게 만든다. </br>
+필드너비 성분은 문자 단위의 최대 필드 너비를 지정한다. 길이 수정자 성분은 변환 결과가 배정될 인수의 크기를 지정한다. </br>
+변환 형식 성분은 printf류 함수들에 쓰이는 값과 비슷하되 몇가지 차이가 존재한다. 하나는 입력의 부호 있는 정수가 부호 없는 정수 형식의 인수에 저장될 수 있다는 것이다. </br>
+scanf 함수들에도 <stdarg.h>에 지정된 가변 인수 목록들을 사용하는 버전들이 존재한다. </br>
+        #include <stdarg.h>
+        #include <stdio.h>
+
+        int vscanf(const char *restrict format, va_list arg);
+        int vfscanf(FILE *restrict fp, const char *restrict format, va_list arg);
+        int vsscanf(const char *restrict buf, const char *restrict format, va_list arg);
+
+## 5.12 구현 세부사항
+
+UNIX 시스템에서 표준 I/O 라이브러리 루틴들은 내부적으로 I/O 루틴들을 호출해서 작업을 수행한다. </br>
+표준 I/O 스트림마다 그에 연관된 파일 서술자가 존재하는데, 그 파일 서술자는 fileno 함수로 얻을 수 있다.
+        #include <stdio.h>
+
+        int fileno(FILE *fp);
+이 함수는 이를테면 dup나 fcntl 함수를 호출하고자 할 때 필요하다.
+
+(ex3) 이 프로그램은 각 스트림에 대해 버퍼링 정보를 출력하기 전에 I/O 연산을 출력해야 한다. 이는 보통의 경우 스트림에 대한 버퍼가 최초의 I/O 연산에서 비로소 할당되기 때문이다. </br>
+구조체 멤버 _IO_file_flags_, _IO_buf_base, _IO_buf_end와 상수 _IO_UNBUFFERED, _IO_LINE_BUFFERED는 linux 가 사용하는 GNU 표준 I/O 라이브러리가 정의한 것이다. </br>
+이 시스템의 경우 터미널에 연결된 표준 입력과 표준 출력에 대해서는 줄 단위 버퍼링이 쓰임을 알 수 있다. 
+
+## 5.13 임시 파일
+
+ISO C 표준은 임시 파일 생성을 돕는 두가지 표준 I/O 라이브러리 함수를 정의한다.
+        #include <stdio.h>
+
+        char *tmpnam(char *ptr);
+        FILE *tmpfile(void);
+tmpnam 함수는 기존의 어떤 파일과도 이름이 같지 않은 유효한 경로이름을 담은 문자열을 생성한다. 이 함수는 최대 TMP_MAX번까지 호출될 때마다 다른 이름을 생성한다. </br>
+ptr이 NULL이면 생성된 경로이름은 정적 영역에 저장되며, 함수는 그 영역을 가리키는 포인터를 돌려준다. 이후, tmpnam을 다시 호출하면 그 정적 영역에 새 이름이 덮어 쓰인다. </br>
+ptr이 NULL이 아니면 함수는 ptr이 적어도 L_tmpnam개의 문자들을 담을 수 있는 배열을 가리킨다고 가정한다. 이 경우 생성된 경로이름은 그 배열에 저장되며 함수는 ptr을 돌려준다.
+
+(ex4) tmpfile의 전형적인 구현 방식은 tmpnam으로 고유한 경로이름을 얻고, 그것으로 파일을 생성하고, 그에 대해 즉시 unlink를 호출하는 것이다. </br>
+파일을 언링크해도 그 즉시 내용이 삭제되지는 않는다. 파일이 닫혀야 실제로 삭제된다. 이러한 특성 덕분에, tmpfile를 사용하는 프로그램이 임시 파일을 명시적으로 삭제해 주지 않아도 된다. </br>
+
+단일 UNIX 규격의 한 XSI 확장에는 임시 파일에 대한 두가지의 또 다른 함수가 정의되어 있다.
+        #include <stdio.h>
+
+        char *tempnam(const char *directory, const char *prefix);
+tempnam 함수는 tmpnam과 비슷하되, 생성된 경로이름의 디렉토리와 접두어를 지정할 수 있다는 점에서 차이를 보인다. </br>
+디렉토리의 경우, 함수는 다음 네가지 방식을 차례로 시도해서 가장 먼저 성공한 방식의 디렉토리 이름을 사용한다.
+1. 환경 변수 TMPDIR가 정의되어 있으면 그 변수의 값이 디렉토리로 쓰인다.
+2. directory가 NULL이 아니면 그것이 디렉토리로 쓰인다.
+3. <stdio.h>의 p_tmpdir 문자열이 정의되어 있으면 그것이 디렉토리로 쓰인다.
+4. 지역 디렉토리가 디렉토리로 쓰인다.
+
+prefix 인수가 NULL이 아니면 그것이 가리키는 문자열의 파일이름의 접두어로 쓰인다. 그 문자열은 반드시 5자 이하이어야 한다. </br>
+이 함수는 malloc 함수를 호출해서 할당한 메모리에 경로이름을 저장한다. 
+
+(ex5) 주어진 명령줄 인수가 빈칸으로 시작하면 이 프로그램은 널 포인터를 함수에 넘겨준다. 
+
+XSI가 정의하는 또다른 임시 파일 관련 함수는 mkstemp이다. 이것은 tmpfile과 비슷하되 파일 포인터가 아니라 파일 서술자를 돌려준다는 점에서 차이가 난다. 
+        #include <stdlib.h>
+
+        int mkstemp(char *template);
+반환된 파일 서술자는 읽기 및 쓰기용으로 열린 것이다. template 인수는 임시 파일의 이름의 틀로 쓰인다. 이 인수에는 xxxxxx로 끝나는 경로이름 문자열을 지정해야 한다. </br>
+호출 성공시 함수는 template의 xxxxxx 부분이 적절히 치환된 고유한 경로이름을 만들어서 임시 파일을 생성한다. </br> 
+tmpfile과 달리, mkstemp로 생성된 임시 파일은 자동으로 제거되지 않는다. 그 임시 파일을 파일 시스템 이름 공간에서 제거하려면 명시적으로 파일을 언링크해야 한다. </br>
+tmpnam이나 tempnam에는 한가지 단점이 있다. 이 함수들을 사용할 때의 문제는 응용 프로그램이 고유한 경로이름을 얻은 시점과 그것으로 파일을 생성한 시점 사이에 시간 여유가 존재한다는 것이다. </br>
+그 시간 여유 도중에 다른 프로세스가 동일한 이름으로 파일을 생성할 수도 있다. 따라서 그런 문제가 없는 tmpfile 함수나 mkstemp 함수를 사용하는 것이 바람직하다.
